@@ -1,16 +1,16 @@
 import React from "react";
 import { View, Alert, ScrollView, Text } from "react-native";
 import ExerciseCard from "@/components/ExerciseCard";
-import { useDB } from "@/db/useDB";
+import { useSQLiteContext } from "expo-sqlite";
 import { runSql } from "@/db/schema";
 import type { Exercise } from "@/db/types";
 
 export default function TodayScreen() {
-  const { db, ready } = useDB();
+  const db = useSQLiteContext();
   const [exercises, setExercises] = React.useState<Exercise[]>([]);
 
   React.useEffect(() => {
-    if (!ready || !db) return;
+    if (!db) return;
     (async () => {
       try {
         const res = await runSql(
@@ -28,7 +28,7 @@ export default function TodayScreen() {
         console.warn("load exercises error", e);
       }
     })();
-  }, [ready, db]);
+  }, [db]);
 
   return (
     <ScrollView className="flex-1 bg-white p-4 dark:bg-black">

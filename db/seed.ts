@@ -38,12 +38,63 @@ export async function seedExercises(db: any) {
   ];
 
   try {
-    for (const e of exs) {
-      await runSql(
-        db,
-        'INSERT OR IGNORE INTO exercises (id,name,primary_target,secondary_target,substitutions) VALUES (?,?,?,?,?)',
-        [e.id, e.name, e.primary, e.secondary ?? null, e.substitutions ?? null]
+    // En transaction pour de meilleures perfs et atomicité
+    if (typeof db.withTransactionAsync === 'function') {
+      await db.withTransactionAsync(async (tx?: any) => {
+        const conn = tx ?? db;
+        if (conn && typeof conn.prepareAsync === 'function') {
+          const stmt = await conn.prepareAsync(
+            'INSERT OR IGNORE INTO exercises (id,name,primary_target,secondary_target,substitutions) VALUES ($id,$name,$p,$s,$subs)'
+          );
+          try {
+            for (const e of exs) {
+              await stmt.executeAsync({
+                $id: e.id,
+                $name: e.name,
+                $p: e.primary,
+                $s: e.secondary ?? null,
+                $subs: e.substitutions ?? null,
+              });
+            }
+          } finally {
+            await stmt.finalizeAsync();
+          }
+        } else {
+          for (const e of exs) {
+            await runSql(
+              conn,
+              'INSERT OR IGNORE INTO exercises (id,name,primary_target,secondary_target,substitutions) VALUES (?,?,?,?,?)',
+              [e.id, e.name, e.primary, e.secondary ?? null, e.substitutions ?? null]
+            );
+          }
+        }
+      });
+    } else if (typeof db.prepareAsync === 'function') {
+      const stmt = await db.prepareAsync(
+        'INSERT OR IGNORE INTO exercises (id,name,primary_target,secondary_target,substitutions) VALUES ($id,$name,$p,$s,$subs)'
       );
+      try {
+        for (const e of exs) {
+          await stmt.executeAsync({
+            $id: e.id,
+            $name: e.name,
+            $p: e.primary,
+            $s: e.secondary ?? null,
+            $subs: e.substitutions ?? null,
+          });
+        }
+      } finally {
+        await stmt.finalizeAsync();
+      }
+    } else {
+      // Fallback: sans transaction ni prepared
+      for (const e of exs) {
+        await runSql(
+          db,
+          'INSERT OR IGNORE INTO exercises (id,name,primary_target,secondary_target,substitutions) VALUES (?,?,?,?,?)',
+          [e.id, e.name, e.primary, e.secondary ?? null, e.substitutions ?? null]
+        );
+      }
     }
     console.log('seed ok');
   } catch (err) {

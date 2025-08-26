@@ -6,15 +6,24 @@ type Props = {
   target: string;
   onLog: () => void;
   onSwap: () => void;
+  lastSummary?: string;
+  setsTodayCount?: number;
+  debug?: boolean;
 };
 
-export default function ExerciseCard({ name, target, onLog, onSwap }: Props) {
+export default function ExerciseCard({ name, target, onLog, onSwap, lastSummary, setsTodayCount, debug }: Props) {
   return (
     <View className="mb-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
       <View className="mb-3 flex-row items-center justify-between">
         <Text className="text-lg font-semibold text-gray-900 dark:text-gray-100">{name}</Text>
         <Text className="text-xs text-gray-500 dark:text-gray-400">{target}</Text>
       </View>
+      {lastSummary ? (
+        <Text className="mb-3 text-xs text-gray-600 dark:text-gray-400">Dernier : {lastSummary}</Text>
+      ) : null}
+      {debug && typeof setsTodayCount === 'number' ? (
+        <Text className="-mt-2 mb-3 text-[10px] text-gray-400">{setsTodayCount} sets aujourd'hui</Text>
+      ) : null}
       <View className="flex-row gap-3">
         <Pressable
           onPress={onLog}
@@ -32,4 +41,3 @@ export default function ExerciseCard({ name, target, onLog, onSwap }: Props) {
     </View>
   );
 }
-

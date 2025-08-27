@@ -8,7 +8,7 @@ export async function migrateDbIfNeeded(db: any): Promise<void> {
   const rows: any = res?.rows;
   const current = rows && rows.length > 0 ? (rows.item(0).user_version as number) : 0;
 
-  const DATABASE_VERSION = 2;
+  const DATABASE_VERSION = 3;
   if ((current ?? 0) >= DATABASE_VERSION) return;
 
   // v0 -> v1: créer le schéma initial + index
@@ -93,6 +93,23 @@ export async function migrateDbIfNeeded(db: any): Promise<void> {
     await runSql(db, `CREATE INDEX IF NOT EXISTS idx_sets_workoutId ON sets(workoutId)`);
     await runSql(db, `CREATE INDEX IF NOT EXISTS idx_sets_exerciseId ON sets(exerciseId)`);
     await runSql(db, `PRAGMA user_version = 2`);
+  }
+
+  // v2 -> v3: Table workout_exercises to persist session exercise list and order
+  if ((current ?? 0) <= 2) {
+    await runSql(
+      db,
+      `CREATE TABLE IF NOT EXISTS workout_exercises(
+         workoutId TEXT NOT NULL,
+         ord INT NOT NULL,
+         exerciseId TEXT NOT NULL,
+         PRIMARY KEY(workoutId, ord),
+         FOREIGN KEY(workoutId) REFERENCES workouts(id) ON DELETE CASCADE,
+         FOREIGN KEY(exerciseId) REFERENCES exercises(id) ON DELETE CASCADE
+       );`
+    );
+    await runSql(db, `CREATE INDEX IF NOT EXISTS idx_workout_exercises_workoutId ON workout_exercises(workoutId)`);
+    await runSql(db, `PRAGMA user_version = 3`);
   }
 }
 

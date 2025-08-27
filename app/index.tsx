@@ -1,11 +1,10 @@
-import React from "react";
-import { View, Text } from "react-native";
 import { Link } from "expo-router";
+import { Text, View } from "react-native";
 
 export default function IndexScreen() {
   return (
     <View className="flex-1 items-center justify-center gap-6 bg-white p-6 dark:bg-black">
-      <Text className="text-2xl font-bold text-gray-900 dark:text-gray-100">Muscu AI</Text>
+      <Text className="text-2xl font-bold text-gray-900 dark:text-gray-100">Athletica</Text>
       <View className="w-full max-w-sm gap-3">
         <Link
           href="/today"

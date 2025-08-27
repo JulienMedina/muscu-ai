@@ -9,11 +9,12 @@ type Props = {
   lastSummary?: string;
   setsTodayCount?: number;
   debug?: boolean;
+  onLongPress?: (e?: any) => void;
 };
 
-export default function ExerciseCard({ name, target, onLog, onSwap, lastSummary, setsTodayCount, debug }: Props) {
+export default function ExerciseCard({ name, target, onLog, onSwap, lastSummary, setsTodayCount, debug, onLongPress }: Props) {
   return (
-    <View className="mb-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+    <Pressable onLongPress={onLongPress} delayLongPress={250} className="mb-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
       <View className="mb-3 flex-row items-center justify-between">
         <Text className="text-lg font-semibold text-gray-900 dark:text-gray-100">{name}</Text>
         <Text className="text-xs text-gray-500 dark:text-gray-400">{target}</Text>
@@ -38,6 +39,6 @@ export default function ExerciseCard({ name, target, onLog, onSwap, lastSummary,
           <Text className="text-sm font-medium text-gray-900 dark:text-gray-100">Remplacer</Text>
         </Pressable>
       </View>
-    </View>
+    </Pressable>
   );
 }

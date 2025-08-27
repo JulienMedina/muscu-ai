@@ -1,16 +1,18 @@
 import React from "react";
 import { View, Alert, ScrollView, Text, Switch } from "react-native";
-import Animated, { Layout, useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
+import Animated, { Layout, useSharedValue, useAnimatedStyle, FadeIn, FadeInDown, FadeOut, FadeOutDown } from 'react-native-reanimated';
 import ExerciseCard from "@/components/ExerciseCard";
 import { useSQLiteContext } from "expo-sqlite";
 import { runSql } from "@/db/schema";
 import type { Exercise } from "@/db/types";
 import SetLogModal from "@/components/SetLogModal";
 import SwapExerciseModal from "@/components/SwapExerciseModal";
+import RestTimer, { RestTimerCompact } from "@/components/RestTimer";
 import { ensureWorkoutForToday, insertSet, getLastSetForToday, getLastSetHistorical, countSetsToday, type SetRow } from "@/db/sets";
 import { getExercisesForWorkout, initWorkoutExercisesIfEmpty, replaceExerciseInWorkout, saveWorkoutExercisesOrder } from "@/db/workout_exercises";
 import { recommendNextLoad } from "@/logic/rpe";
 import { Link } from "expo-router";
+import * as Haptics from 'expo-haptics';
 
 export default function TodayScreen() {
   const db = useSQLiteContext();
@@ -28,6 +30,46 @@ export default function TodayScreen() {
   const [swapFor, setSwapFor] = React.useState<Exercise | null>(null);
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
   const itemLayouts = React.useRef<Record<string, { y: number; height: number }>>({});
+  // Rest timer state
+  const [restVisible, setRestVisible] = React.useState<boolean>(false);
+  const [restTotal, setRestTotal] = React.useState<number>(0);
+  const [restRemain, setRestRemain] = React.useState<number>(0);
+  const [restRunning, setRestRunning] = React.useState<boolean>(false);
+  const [restExpanded, setRestExpanded] = React.useState<boolean>(true);
+  const restInterval = React.useRef<any>(null);
+
+  function stopRestTimer() {
+    if (restInterval.current) clearInterval(restInterval.current);
+    restInterval.current = null;
+    setRestRunning(false);
+    setRestVisible(false);
+    setRestExpanded(false);
+  }
+
+  function startRestTimer(sec: number) {
+    if (restInterval.current) clearInterval(restInterval.current);
+    const s = Math.max(1, Math.floor(sec));
+    setRestTotal(s);
+    setRestRemain(s);
+    setRestVisible(true);
+    setRestRunning(true);
+    // Start in compact mode so the top chip is immediately visible
+    setRestExpanded(false);
+    restInterval.current = setInterval(() => {
+      setRestRemain((prev) => {
+        const next = prev - 1;
+        if (next <= 0) {
+          clearInterval(restInterval.current);
+          restInterval.current = null;
+          setRestRunning(false);
+          // haptic notify
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          return 0;
+        }
+        return next;
+      });
+    }, 1000);
+  }
   const scrollY = React.useRef(0);
   const contentTopWindowY = React.useRef(0);
   const listContainerRef = React.useRef<View>(null);
@@ -98,6 +140,7 @@ export default function TodayScreen() {
   }, [db]);
 
   return (
+    <View className="flex-1 bg-white dark:bg-black">
     <ScrollView
       className="flex-1 bg-white p-4 dark:bg-black"
       scrollEnabled={!draggingId}
@@ -237,6 +280,9 @@ export default function TodayScreen() {
               `Prochaine charge: ${rec.nextLoad.toFixed(1)} kg\n${rec.note}`
             );
 
+            // Start rest timer
+            startRestTimer(restSec ?? 120);
+
             // Update session cache for immediate continuity
             sessionCache.current[selected.id] = {
               loadKg: rec.nextLoad,
@@ -335,6 +381,42 @@ export default function TodayScreen() {
         }}
       />
 
+      {/* Rest timer overlay */}
+      {restVisible && (
+        <RestTimer
+          remainingSec={restRemain}
+          totalSec={restTotal}
+          running={restRunning}
+          onToggle={() => {
+            if (restRunning) {
+              if (restInterval.current) clearInterval(restInterval.current);
+              restInterval.current = null;
+              setRestRunning(false);
+            } else {
+              setRestRunning(true);
+              restInterval.current = setInterval(() => {
+                setRestRemain((prev) => {
+                  const next = prev - 1;
+                  if (next <= 0) {
+                    clearInterval(restInterval.current);
+                    restInterval.current = null;
+                    setRestRunning(false);
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                    return 0;
+                  }
+                  return next;
+                });
+              }, 1000);
+            }
+          }}
+          onPlus30={() => {
+            setRestTotal((t) => t + 30);
+            setRestRemain((r) => r + 30);
+          }}
+          onCancel={stopRestTimer}
+        />
+      )}
+
       <View className="mt-6 items-center pb-6">
         <Link
           href="/"
@@ -410,5 +492,79 @@ export default function TodayScreen() {
         </View>
       ) : null}
     </ScrollView>
+
+    {restVisible && !restExpanded && (
+      <Animated.View entering={FadeIn} exiting={FadeOut}>
+      <RestTimerCompact
+        remainingSec={restRemain}
+        totalSec={restTotal}
+        running={restRunning}
+        onToggle={() => {
+          if (restRunning) {
+            if (restInterval.current) clearInterval(restInterval.current);
+            restInterval.current = null;
+            setRestRunning(false);
+          } else {
+            setRestRunning(true);
+            restInterval.current = setInterval(() => {
+              setRestRemain((prev) => {
+                const next = prev - 1;
+                if (next <= 0) {
+                  clearInterval(restInterval.current);
+                  restInterval.current = null;
+                  setRestRunning(false);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                  return 0;
+                }
+                return next;
+              });
+            }, 1000);
+          }
+        }}
+        onCancel={stopRestTimer}
+        onExpand={() => setRestExpanded(true)}
+      />
+      </Animated.View>
+    )}
+
+    {restVisible && restExpanded && (
+      <Animated.View entering={FadeInDown.springify().damping(20)} exiting={FadeOutDown.duration(180)}>
+      <RestTimer
+        remainingSec={restRemain}
+        totalSec={restTotal}
+        running={restRunning}
+        onToggle={() => {
+          if (restRunning) {
+            if (restInterval.current) clearInterval(restInterval.current);
+            restInterval.current = null;
+            setRestRunning(false);
+          } else {
+            setRestRunning(true);
+            restInterval.current = setInterval(() => {
+              setRestRemain((prev) => {
+                const next = prev - 1;
+                if (next <= 0) {
+                  clearInterval(restInterval.current);
+                  restInterval.current = null;
+                  setRestRunning(false);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                  return 0;
+                }
+                return next;
+              });
+            }, 1000);
+          }
+        }}
+        onPlus30={() => {
+          setRestTotal((t) => t + 30);
+          setRestRemain((r) => r + 30);
+        }}
+        onCancel={stopRestTimer}
+        onMinimize={() => setRestExpanded(false)}
+      />
+      </Animated.View>
+    )}
+
+    </View>
   );
 }
